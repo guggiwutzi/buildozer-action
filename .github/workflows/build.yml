@@ -5,30 +5,52 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build Android APK
-        uses: ArtemSBulgakov/buildozer-action@v1
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
-          command: buildozer android debug
-          buildozer_version: stable
-          repository_root: .
-          title: E-Motors
-          package_name: emotorpro
-          package_domain: org.bastler
-          source_dir: .
-          source_include_exts: py,png,kv
-          requirements: python3,kivy,requests,plyer
-          orientation: portrait
-          osx_kivy_version: 2.1.0
-          android_api: 33
-          android_minapi: 24
-          android_sdk: 33
-          android_ndk: 25.2.9519653
-          android_private_storage: True
-          android_permissions: INTERNET,VIBRATE
-          icon_filename: logo.png
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
+          sudo apt-get install -y libgstreamer1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav
+
+      - name: Install Python Build Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install cython==0.29.36
+          pip install git+https://github.com
+          pip install git+https://github.com
+
+      - name: Configure Buildozer Settings
+        run: |
+          sed -i 's/^title =.*/title = E-Motors/' buildozer.spec
+          sed -i 's/^requirements =.*/requirements = python3,kivy,requests,plyer/' buildozer.spec
+          sed -i 's/^#android.permissions =.*/android.permissions = INTERNET,VIBRATE/' buildozer.spec
+          sed -i 's/^#icon.filename =.*/icon.filename = %(source.dir)s\/logo.png/' buildozer.spec
+          sed -i 's/^android.api =.*/android.api = 33/' buildozer.spec
+          sed -i 's/^android.minapi =.*/android.minapi = 24/' buildozer.spec
+
+      - name: Build Android APK with Buildozer
+        run: |
+          export BUILDOZER_ALLOW_KIVY_NEW_DESIGN=1
+          yes | buildozer android debug
+
+      - name: Upload Finished APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: E-Motors-Android-App
+          path: bin/*.apk
